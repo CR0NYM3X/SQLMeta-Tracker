@@ -2,35 +2,40 @@
 ![Logo de GitHub](https://github.com/CR0NYM3X/SQLMeta-Tracker/blob/main/IMG/logo-new.png)
 # SQLMeta-Tracker
 
-En el entorno empresarial , donde la eficiencia y la precisión son clave, nuestra herramienta SQLMeta-Tracker en servidores de base de datos **psql y mssql** se destaca como una solución esencial para la gestión y mantenimiento de infraestructuras de datos. A continuación, presentamos algunas de las principales ventajas de nuestra herramienta y cómo contribuye a un entorno empresarial más eficaz:
+In the business environment, where efficiency and precision are key, our SQLMeta-Tracker tool for psql and mssql database servers stands out as an essential solution for the management and maintenance of data infrastructures. Below, we present some of the main advantages of our tool and how it contributes to a more effective business environment:
 
-**1. Centralización de Datos Técnicos:**
-   - Nuestra herramienta recopila información técnica detallada de cada servidor de base de datos, centralizando estos datos en un repositorio accesible. Esto facilita la consulta y el análisis de la información, permitiendo a los equipos de TI tomar decisiones rápidas.
+1. **Centralization of Technical Data:**
 
-**2. Monitoreo y Mantenimiento Eficiente:**
-   - Al proporcionar una vista unificada del estado de los servidores y sus bases de datos, se mejora significativamente la capacidad de monitoreo y mantenimiento preventivo. Los administradores pueden identificar rápidamente problemas potenciales y abordar las necesidades de mantenimiento antes de que se conviertan en problemas críticos.
+   Our tool collects detailed technical information from each database server, centralizing this data in an accessible repository. This facilitates the consultation and analysis of information, allowing IT teams to make quick decisions.
 
-**3. Mejora en la Seguridad:**
-   - La herramienta permite auditar y revisar configuraciones de seguridad en cada servidor, asegurando que se cumplan las mejores prácticas y normativas. Esto es crucial para mantener la integridad y seguridad de los datos empresariales.
+2. **Efficient Monitoring and Maintenance:**
 
-**4. Ahorro de Tiempo y Recursos:**
-   - Al automatizar la recolección de información técnica y eliminar la necesidad de realizar estas tareas manualmente, se libera tiempo y recursos para enfocarse en actividades más estratégicas y de alto valor.
+   By providing a unified view of the status of servers and their databases, it significantly improves the ability to monitor and perform preventive maintenance. Administrators can quickly identify potential problems and address maintenance needs before they become critical issues.
 
-**5. Reportes y Análisis Avanzados:**
-   - Con capacidades de generación de reportes detallados, los equipos pueden analizar el rendimiento y el uso de las bases de datos de manera efectiva. Esto facilita la optimización de recursos y la planificación futura.
+3. **Improved Security:**
 
+   The tool allows auditing and reviewing security configurations on each server, ensuring compliance with best practices and regulations. This is crucial for maintaining the integrity and security of business data.
 
-**6. Facilita la Documentación Técnica:**
-   - Al mantener una memoria técnica actualizada de cada servidor, se facilita la creación y mantenimiento de la documentación técnica. Esto es especialmente útil durante auditorías, actualizaciones y transiciones de personal.
+4. **Time and Resource Savings:**
 
-Nuestra herramienta SQLMeta-Tracker es una pieza clave para cualquier empresa que busque mejorar la eficiencia, seguridad y gestión de su infraestructura de datos. Al centralizar y automatizar la recolección de información técnica, permite a las organizaciones tomar decisiones más informadas, mantener la seguridad y optimizar el uso de recursos.
- 
+   By automating the collection of technical information and eliminating the need for manual tasks, it frees up time and resources to focus on more strategic and high-value activities.
 
-Es importante destacar que esta herramienta está diseñada para centralizar datos técnicos y no debe ser considerada una herramienta de monitoreo al 100%. Su enfoque principal es proporcionar un inventario detallado y una ficha técnica de cada servidor, permitiendo una gestión más organizada y eficiente de la infraestructura de bases de datos.
+5. **Advanced Reporting and Analysis:**
 
+   With detailed reporting capabilities, teams can effectively analyze the performance and usage of databases. This facilitates resource optimization and future planning.
 
-### RDBMS Soportados : 
-- Postgresql 100%
+6. **Facilitates Technical Documentation:**
+
+   By maintaining an up-to-date technical memory of each server, it simplifies the creation and maintenance of technical documentation. This is especially useful during audits, updates, and personnel transitions.
+
+Our SQLMeta-Tracker tool is a key component for any company looking to improve the efficiency, security, and management of its data infrastructure. By centralizing and automating the collection of technical information, it enables organizations to make more informed decisions, maintain security, and optimize resource usage.
+
+**It is important to note that this tool is designed to centralize technical data and should not be considered a 100% monitoring tool. Its main focus is to provide a detailed inventory and technical profile of each server, allowing for a more organized and efficient management of the database infrastructure.**
+
+**Supported RDBMS:**
+- PostgreSQL 100%
 - SQL Server 100%
-- Mysql 0%
+- MySQL 0%
 - MongoDB 0%
+
+ 
