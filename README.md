@@ -1,3 +1,5 @@
+
+![Logo de GitHub](https://github.com/CR0NYM3X/SQLMeta-Tracker/blob/main/IMG/logo-new.png)
 # SQLMeta-Tracker
 
 En el entorno empresarial , donde la eficiencia y la precisión son clave, nuestra herramienta SQLMeta-Tracker en servidores de base de datos **psql y mssql** se destaca como una solución esencial para la gestión y mantenimiento de infraestructuras de datos. A continuación, presentamos algunas de las principales ventajas de nuestra herramienta y cómo contribuye a un entorno empresarial más eficaz:
