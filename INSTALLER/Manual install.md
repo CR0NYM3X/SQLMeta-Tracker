@@ -17,14 +17,17 @@ select extname,extversion from pg_extension ;
 ```
 
 
-Estructura Tablas con date_insert,  last_update:
+### Structure table  date_insert,  last_update:
 - ctl_users 
-- ctl_server
+- ctl_servers
 - ctl_querys
 - cat_rdbms
-- ctl_project_settings
-- log_msg_error
+- ctl_settings
+- log_error
 - log_exec_querys
 
   
-- funcion de decript , encript: automatico al insertar o hacer update 
+### Funcion  
+- decript , encript: automatico al insertar o hacer update 
+- auto_create_tables_partitioned, create_tables_partitioned,  purge_partitions
+
