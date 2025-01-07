@@ -15,3 +15,16 @@ select extname,extversion from pg_extension ;
 | pg_cron            | 1.6        |
 +--------------------+------------+
 ```
+
+
+Estructura Tablas con date_insert,  last_update:
+- ctl_users 
+- ctl_server
+- ctl_querys
+- cat_rdbms
+- ctl_project_settings
+- log_msg_error
+- log_exec_querys
+
+  
+- funcion de decript , encript: automatico al insertar o hacer update 
