@@ -10,5 +10,6 @@ status bit,
 log_msg text, 
 start_time timestamp, 
 end_time timestamp,
+exec_duration time,
 rows_affected bigint  
 ```
