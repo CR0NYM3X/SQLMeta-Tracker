@@ -14,7 +14,7 @@ exec_duration time,
 rows_affected bigint  
 ```
 
-### Extras 
+### Mejoras
 ```
 Agregarle la opcion de que realice una sola conexion y cierre una vez termine de ejecutar todas las querys. 
 Agregarle que pueda hacer  fetch. y limiten bien todo 
