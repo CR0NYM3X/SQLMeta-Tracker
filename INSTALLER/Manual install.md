@@ -29,7 +29,8 @@ select extname,extversion from pg_extension ;
 ### Structure table  date_insert,  last_update:
 - ctl_users 
 - ctl_servers
-- ctl_querys
+- ctl_querys: 
+- ctl_config_querys: enabled_fetch, limit_fetch
 - cat_rdbms
 - ctl_settings
 - log_error
