@@ -30,7 +30,7 @@ select extname,extversion from pg_extension ;
 - ctl_users 
 - ctl_servers
 - ctl_querys: 
-- ctl_config_querys: enabled_fetch, limit_fetch
+- ctl_config_querys: enabled_fetch, limit_fetch, lvl_exec_query, db_name_default
 - cat_rdbms
 - ctl_settings
 - log_error
