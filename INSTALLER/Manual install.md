@@ -59,3 +59,9 @@ select extname,extversion from pg_extension ;
 - gather_server_data
 - fn_exec_query
 - fn_add_query
+
+
+
+### Mejoras 
+
+Agregar templete_rdbms parametrizadas
