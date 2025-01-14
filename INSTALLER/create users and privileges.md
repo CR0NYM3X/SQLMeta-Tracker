@@ -1,6 +1,9 @@
 
 # PRIVILEGIOS NECESARIOS
 
+
+
+
 # PSQL 
 ```
 ******************************************************************
@@ -17,7 +20,10 @@ DECLARE
 BEGIN
 
     IF    var_current_database::varchar   = 'postgres'::varchar THEN
-        
+	-- Por seguridad se agrega estos parametros , ya que hay ocasiones que las db estan usando el pg_dump y bloque tablas 
+	ALTER USER systest  SET statement_timeout = '45min';	
+	ALTER USER systest  SET statement_timeout = '45min';	
+
         ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO systest; --- permission para tablas futuras
         GRANT select on all tables in schema public   to   systest; 
  
