@@ -30,9 +30,9 @@ select extname,extversion from pg_extension ;
 - ctl_users 
 - ctl_servers
 - ctl_querys: 
-- ctl_config_querys: enabled_fetch, limit_fetch, lvl_exec_query, db_name_default
+- ctl_config_querys: enabled_fetch, limit_fetch, lvl_exec_query, db_name_default, parameter_set 
 - cat_rdbms
-- ctl_settings
+- ctl_settings , puedes configurar a nivel global en caso de que las querys no tengan configurado  se colocan unas por default 
 - log_error
 - log_exec_querys
 
