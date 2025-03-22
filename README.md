@@ -1,5 +1,5 @@
 
-![Logo de GitHub](https://github.com/CR0NYM3X/SQLMeta-Tracker/blob/main/IMG/sqlmeta.jpg)
+![Logo de GitHub](https://github.com/CR0NYM3X/SQLMeta-Tracker/blob/main/IMG/sql_meta.jpg)
 # SQLMeta-Tracker
 
 In the business environment, where efficiency and precision are key, our SQLMeta-Tracker tool for psql and mssql database servers stands out as an essential solution for the management and maintenance of data infrastructures. Below, we present some of the main advantages of our tool and how it contributes to a more effective business environment:
