@@ -39,3 +39,56 @@ Our SQLMeta-Tracker tool is a key component for any company looking to improve t
 - MongoDB 0%
 
  
+--- 
+
+
+ 
+### **Usos principales de la herramienta**
+
+1.  **Memoria técnica / Inventario**  
+    En escenarios de contingencia, contar con información completa de la infraestructura de bases de datos es crítico para restaurar rápidamente un entorno. Por ejemplo, al recuperar un backup, es indispensable conocer:
+    *   **Sistema Operativo:** tipo, versión, cantidad de CPU, memoria y discos.
+    *   **Base de datos:** motor, versión, configuraciones, accesos.  
+        Esto permite reconstruir el ambiente tal como estaba antes, evitando inconsistencias o configuraciones nuevas no deseadas.
+
+2.  **Información histórica**  
+    Facilita el análisis de tendencias y comportamientos, como:
+    *   Crecimiento de datos.
+    *   Consumo de disco y memoria.
+    *   Creación y modificación de objetos.
+
+3.  **Auditoría**  
+    Proporciona evidencia para validar cambios importantes, por ejemplo:
+    *   Creación o eliminación de bases de datos.
+    *   Alta o baja de usuarios.
+    *   Accesos por usuario (ej. mediante `pg_auth_mon`).
+
+4.  **Gestión de incidentes**  
+    Permite recuperar información crítica en casos donde se desconoce el estado previo, como:
+    *   Restaurar contraseñas modificadas sin exponerlas.
+    *   Validar parámetros de configuración en una fecha específica.
+    *   Recuperar usuarios eliminados, sus permisos y accesos.
+
+5.  **Reportes de usuarios**  
+    Genera informes detallados sobre:
+    *   Propietarios de objetos.
+    *   Uso y propósito de cada usuario.
+    *   Aplicaciones asociadas.
+
+6.  **Reporte de parches**  
+    Control y seguimiento de actualizaciones aplicadas al sistema y la base de datos.
+
+7.  **Reporte de mantenimientos**  
+    Documentación de tareas programadas y ejecutadas para garantizar la estabilidad del entorno.
+
+8.  **Validación de hardening**  
+    Verificación del cumplimiento de políticas de seguridad en servidores y bases de datos.
+
+9.  **Validaciones de reloads**  
+    Confirmación de recargas de configuración y su impacto en el sistema.
+
+10. **Programación de ejecuciones**  
+    Planificación y control de tareas automatizadas relacionadas con la administración de la base de datos.
+
+ 
+ 
