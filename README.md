@@ -91,4 +91,8 @@ Our SQLMeta-Tracker tool is a key component for any company looking to improve t
     Planificación y control de tareas automatizadas relacionadas con la administración de la base de datos.
 
  
+### Ventaja : 
+ --- puedes tener multiples nodos y cada nodo trabajara un grupo de servidores, esto para no sobrecargar un solo servidor cuando ya se trabajan con más de tres mil servidores 
+ se tendra un servidor maestro que sera el encargado de centralizar toda la información, tendra interface web y todo.
+ 
  
