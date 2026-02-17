@@ -61,7 +61,9 @@ select * from fdw_conf.scan_rules_query limit 10;
 --------------------------------------------------------
 
 
-Esquemas: logs,psql,mssql,prttb
+Esquemas: logs,psql,mssql,prttb,chg_audit
+
+--------------------------------------------------------
 
 
 
