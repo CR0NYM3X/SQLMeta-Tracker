@@ -38,9 +38,9 @@ select * from fdw_conf.cat_lvl_exec_querys limit 10
 select * from  fdw_conf.ctl_dbms limit 10-- DBMS
 select * from fdw_conf.ctl_ports limit 10 -- Puertos default
 
-select * from fdw_conf.ctl_project_settings limit 10 -- configuraciones que cambian el comportamiento de la herramienta
+select * from fdw_conf.ctl_project_settings limit 10 -- configuraciones que cambian el comportamiento de la herramienta, agregar  (fetch o ),(select o exec)
 
-select * from  fdw_conf.ctl_querys -- donde se guardan 
+select * from  fdw_conf.ctl_querys -- donde se guardan  las querys , agregar (fetch o ),(select o exec)
 ---------------------------------------------------------------
 
 select * from fdw_conf.cat_version_psql_oficial limit 10
