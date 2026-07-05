@@ -104,3 +104,6 @@ El departamento principal que las administra es el **Equipo de Datos (Data Team)
 * **Analistas y Científicos de Datos (Data Analysts / Data Scientists):** Son los consumidores. Entran a la herramienta a buscar tablas, leer descripciones y ver de dónde viene la información antes de crear un reporte o un modelo de IA.
 * **Data Stewards / Equipo de Gobernanza:** Son los bibliotecarios y auditores. Entran a poner etiquetas como "Dato Confidencial", a documentar qué significa cada columna y a asegurar que las reglas de la empresa se cumplan.
 
+```
+https://www.ovaledge.com/blog/openmetadata-vs-datahub
+```
