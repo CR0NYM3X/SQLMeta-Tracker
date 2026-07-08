@@ -23,7 +23,7 @@ Ejecuta este script estrictamente en este orden para respetar las llaves foráne
 
 -- 1. TYPE para el estado de ejecución (Basado en tus logs reales)
 CREATE TYPE fdw_conf.execution_status AS ENUM (
-    'SUCCESSFUL', 
+    'SUCCESS', 
     'FAILED', 
     'RUNNING', 
     'ABORTED', 
@@ -103,7 +103,7 @@ CREATE TABLE fdw_conf.ctl_table_conf (
     target_table VARCHAR(100) NOT NULL,
     target_columns TEXT NOT NULL,       -- ej. 'version_name'
     insert_statement TEXT NOT NULL,     -- ej. 'INSERT INTO pgsql.versions...'
-    table_type VARCHAR(20) NOT NULL DEFAULT 'STANDARD', -- 'STANDARD', 'PRTTB', 'HYPERTABLE'
+    table_type fdw_conf.table_storage_type NOT NULL DEFAULT 'STANDARD', -- 'STANDARD', 'PRTTB', 'HYPERTABLE'
     date_insert TIMESTAMPTZ DEFAULT clock_timestamp()
 );
 
@@ -116,6 +116,14 @@ CREATE TABLE fdw_conf.cat_exec_categories (
     date_insert TIMESTAMPTZ DEFAULT clock_timestamp()
 );
 
+-- Population of the Execution Frequencies Catalog
+INSERT INTO fdw_conf.cat_exec_categories (category_name, description) VALUES
+('daily_task',   'Daily execution queries (e.g., quick telemetry and live states)'),
+('weekly_task',  'Weekly execution queries (e.g., permissions, bulk configurations)'),
+('monthly_task', 'Monthly execution queries (e.g., deep audit, unused objects)'),
+('biweekly_task','Biweekly execution queries'),
+('other',            'Manual or on-demand unscheduled executions');
+
 
 -- Catálogo de Clasificación de Consultas
 CREATE TABLE fdw_conf.cat_query_categories (
@@ -124,6 +132,23 @@ CREATE TABLE fdw_conf.cat_query_categories (
     description TEXT,
     date_insert TIMESTAMPTZ DEFAULT clock_timestamp()
 );
+
+-- Population of the Query Classification Catalog
+INSERT INTO fdw_conf.cat_query_categories (category_name, description) VALUES
+('VERSION',         'Data regarding the engine version or installed patches'),
+('STORAGE',         'Data regarding disk space, database sizes, or physical files'),
+('HARDWARE',        'OS-level information, CPU, RAM, Uptime'),
+('DATABASE',        'Native database properties (encoding, collation, owner)'),
+('SECURITY',        'User audits, granular permissions, HBA, and encryption'),
+('CONFIGURATION',   'Engine parameters (pg_settings, postgresql.conf)'),
+('OBJECT_META',     'Metadata for tables, schemas, indexes, views, sequences, and columns'),
+('PERFORMANCE',     'Usage statistics, unused indexes, autovacuum, and locks'),
+('PROGRAMMABILITY', 'Triggers, Functions (funproc), and installed extensions'),
+('JOB_AGENT',       'Scheduled jobs, tasks, and agents (e.g., MSSQL Jobs)'),
+('BACKUP',          'Information regarding backup retention and execution'),
+('OTHER',           'Fallback classification for miscellaneous or unclassified environment metadata queries');
+
+
 
 -- Tu tabla de configuración refactorizada (Limpia y a prueba de balas)
 -- Tu tabla de configuración refactorizada con el nuevo TYPE
@@ -144,18 +169,7 @@ CREATE TABLE fdw_conf.ctl_query_conf (
     date_insert TIMESTAMPTZ DEFAULT clock_timestamp()
 );
 
--- 7. Reglas de Ejecución de la Consulta
-CREATE TABLE fdw_conf.ctl_query_conf (
-    id_query_conf SERIAL PRIMARY KEY,
-    id_query INT NOT NULL REFERENCES fdw_conf.ctl_queries(id_query) ON DELETE CASCADE,
-    min_version NUMERIC(6,2) NOT NULL,
-    max_version NUMERIC(6,2) NOT NULL,
-    lvl_exec VARCHAR(20) NOT NULL,      -- 'SERVER' o 'DATABASE'
-    query_category VARCHAR(50) NOT NULL,
-    exec_category VARCHAR(50) DEFAULT 'daily_task',          -- ej. 'fdaily_task'
-    is_enabled BOOLEAN DEFAULT TRUE,
-    date_insert TIMESTAMPTZ DEFAULT clock_timestamp()
-);
+
 
 -- 8. Bitácora de Auditoría (Reemplaza a log_exec_query)
 CREATE TABLE fdw_conf.log_exec_query (
@@ -163,7 +177,7 @@ CREATE TABLE fdw_conf.log_exec_query (
     id_server INT NOT NULL REFERENCES fdw_conf.cat_server(id_server),
     id_query INT NOT NULL REFERENCES fdw_conf.ctl_queries(id_query),
     target_db VARCHAR(100) NOT NULL,
-    status VARCHAR(20) NOT NULL,        -- 'SUCCESS', 'FAILED'
+    status fdw_conf.execution_status NOT NULL,        -- 'SUCCESS', 'FAILED'
     rows_affected INT DEFAULT 0,
     error_message TEXT,
     start_time TIMESTAMPTZ DEFAULT clock_timestamp(),
