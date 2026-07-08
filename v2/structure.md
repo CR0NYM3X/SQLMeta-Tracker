@@ -63,6 +63,14 @@ CREATE TABLE fdw_conf.ctl_settings (
     date_insert TIMESTAMPTZ DEFAULT clock_timestamp()
 );
 
+
+-- Registering the authorized cryptographic functions in the configuration catalog
+INSERT INTO fdw_conf.ctl_settings (setting_name, setting_value, data_type, description) 
+VALUES 
+('crypto_encrypt_function', 'fdw_conf.fn_encrypt_credentials', 'text', 'Authorized function for encrypting remote passwords'),
+('crypto_decrypt_function', 'fdw_conf.fn_decrypt_credentials', 'text', 'Authorized function for decrypting remote passwords');
+
+
 -- 3. Bóveda de Credenciales Encriptadas (Zero Trust)
 CREATE TABLE fdw_conf.ctl_remote_users (
     id_user SERIAL PRIMARY KEY,
