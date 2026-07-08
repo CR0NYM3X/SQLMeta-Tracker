@@ -201,114 +201,224 @@ CREATE TABLE fdw_conf.log_exec_query (
 
 ---
 
-### ⚙️ 3. LOS MOTORES DE EXTRACCIÓN (Funciones Core)
+ 
+### 🔐 1. MOTOR CRIPTOGRÁFICO (Zero Trust Encryption)
 
-En tu código anterior, el motor de SQL Server creaba y destruía objetos DDL (`CREATE SERVER`, `DROP FOREIGN TABLE`) en cada ejecución, lo cual infla el catálogo del sistema y genera bloqueos.
-
-Aquí están los esqueletos estructurales (Grado Diamante) para las nuevas funciones. Hemos movido el manejo de errores al estándar y hemos preparado el terreno para usar conexiones persistentes o envoltorios seguros.
-
-#### A. Motor de PostgreSQL (Vía `dblink`)
+Para no dejar llaves expuestas en el código fuente, estas funciones utilizan el espacio de memoria de la sesión (`current_setting`) para leer una llave maestra. De esta forma, la llave solo vive en la RAM durante la ejecución y nunca se guarda en texto plano.
 
 ```sql
+-- ==============================================================================
+-- FUNCTION: fdw_conf.fn_encrypt_credentials
+-- DESCRIPTION: Encrypts sensitive remote passwords using AES-256 via pgcrypto.
+-- Requires a master key injected in the session: SET sqlmeta.master_key = '...';
+-- ==============================================================================
+CREATE OR REPLACE FUNCTION fdw_conf.fn_encrypt_credentials(p_plain_text TEXT) 
+RETURNS BYTEA 
+LANGUAGE plpgsql 
+SECURITY DEFINER
+SET client_min_messages = 'notice'
+SET search_path TO fdw_conf, public, pg_temp
+AS $$
+DECLARE
+    v_master_key TEXT;
+    v_encrypted BYTEA;
+BEGIN
+    -- Retrieve the master key from secure volatile memory
+    v_master_key := current_setting('sqlmeta.master_key', true);
+    
+    IF v_master_key IS NULL OR v_master_key = '' THEN
+        RAISE EXCEPTION 'SECURITY BREACH: Master key not found in session memory. Set sqlmeta.master_key before execution.';
+    END IF;
+
+    -- Encrypt using strong AES-256 cipher
+    v_encrypted := pgp_sym_encrypt(p_plain_text, v_master_key, 'cipher-algo=aes256');
+    
+    -- Scrub memory variable
+    v_master_key := NULL;
+    
+    RETURN v_encrypted;
+END;
+$$;
+
+REVOKE EXECUTE ON FUNCTION fdw_conf.fn_encrypt_credentials(TEXT) FROM public;
+
+-- ==============================================================================
+-- FUNCTION: fdw_conf.fn_decrypt_credentials
+-- DESCRIPTION: Decrypts AES-256 passwords exclusively for background workers.
+-- ==============================================================================
+CREATE OR REPLACE FUNCTION fdw_conf.fn_decrypt_credentials(p_encrypted_data BYTEA) 
+RETURNS TEXT 
+LANGUAGE plpgsql 
+SECURITY DEFINER
+SET client_min_messages = 'notice'
+SET search_path TO fdw_conf, public, pg_temp
+AS $$
+DECLARE
+    v_master_key TEXT;
+    v_plain_text TEXT;
+BEGIN
+    v_master_key := current_setting('sqlmeta.master_key', true);
+    
+    IF v_master_key IS NULL OR v_master_key = '' THEN
+        RAISE EXCEPTION 'SECURITY BREACH: Master key not found in session memory. Set sqlmeta.master_key before execution.';
+    END IF;
+
+    -- Decrypt payload
+    v_plain_text := pgp_sym_decrypt(p_encrypted_data, v_master_key);
+    
+    -- Scrub memory variable
+    v_master_key := NULL;
+    
+    RETURN v_plain_text;
+END;
+$$;
+
+REVOKE EXECUTE ON FUNCTION fdw_conf.fn_decrypt_credentials(BYTEA) FROM public;
+
+```
+
+---
+
+### ⚙️ 2. MOTOR DE EXTRACCIÓN SEGURO POR BLOQUES (`FETCH`)
+
+Hemos tomado tu lógica del `dblink_fetch_better` y la hemos injertado en la función final. Ahora, abre un cursor remoto, extrae los datos en bloques (chunks) parametrizados, los inserta directamente en la tabla destino y documenta meticulosamente el rendimiento y los fallos en `log_exec_query`.
+
+```sql
+-- ==============================================================================
+-- FUNCTION: fdw_conf.pgsql_exec_query
+-- DESCRIPTION: Core extraction engine for PostgreSQL nodes. Connects securely,
+-- decrypts credentials dynamically, and streams data via dblink cursors (FETCH) 
+-- to prevent memory exhaustion (OOM Killer).
+-- ==============================================================================
 CREATE OR REPLACE FUNCTION fdw_conf.pgsql_exec_query(
     p_id_server INT,
     p_id_query INT,
     p_target_db VARCHAR
-) RETURNS TABLE (status BOOLEAN, message TEXT) AS $$
+) RETURNS TABLE (status BOOLEAN, message TEXT) 
+LANGUAGE plpgsql 
+SECURITY DEFINER
+SET client_min_messages = 'notice'
+SET search_path TO fdw_conf, public, pg_temp
+AS $$
 DECLARE
+    -- Server & Credential variables
     v_ip INET;
     v_port INT;
     v_user VARCHAR;
-    v_pass BYTEA;
+    v_pass_enc BYTEA;
+    v_pass_plain TEXT;
+    
+    -- Query & Target variables
     v_source_query TEXT;
-    v_insert_stmt TEXT;
+    v_columns_type TEXT;
+    v_target_schema VARCHAR;
+    v_target_table VARCHAR;
+    v_target_columns TEXT;
+    
+    -- Execution control variables
+    v_conn_name VARCHAR := 'conn_' || md5(random()::TEXT || clock_timestamp()::TEXT);
+    v_cursor_name VARCHAR := 'crs_' || md5(random()::TEXT);
     v_conn_string TEXT;
+    v_decrypt_func VARCHAR;
+    v_dynamic_sql TEXT;
+    v_fetch_sql TEXT;
+    
+    -- Telemetry & Pagination variables
+    v_fetch_size INT := 5000; -- Block size to prevent RAM saturation
+    v_batch_rows INT := 0;
+    v_total_rows INT := 0;
     v_start_time TIMESTAMPTZ := clock_timestamp();
-    v_rows INT := 0;
+    v_conn_opened BOOLEAN := FALSE;
 BEGIN
-    -- 1. Obtener credenciales y servidor
-    SELECT s.ip_address, s.port, u.username, u.password 
-    INTO v_ip, v_port, v_user, v_pass
+    -- [1] Fetch server and encrypted credentials
+    SELECT s.ip_address, s.port, u.username, u.password_enc 
+    INTO v_ip, v_port, v_user, v_pass_enc
     FROM fdw_conf.cat_server s
     JOIN fdw_conf.ctl_remote_users u ON s.id_user = u.id_user
     WHERE s.id_server = p_id_server;
 
-    -- 2. Obtener Query y Destino
-    SELECT q.source_query, t.insert_statement 
-    INTO v_source_query, v_insert_stmt
+    -- [2] Fetch query definition and target table configuration
+    SELECT q.source_query, q.columns_type, t.target_schema, t.target_table, t.target_columns
+    INTO v_source_query, v_columns_type, v_target_schema, v_target_table, v_target_columns
     FROM fdw_conf.ctl_queries q
     JOIN fdw_conf.ctl_table_conf t ON q.id_query = t.id_query
     WHERE q.id_query = p_id_query;
 
-    -- 3. Construir conexión DBLINK segura (Desencriptando contraseña al vuelo)
-    v_conn_string := format('host=%s port=%s dbname=%s user=%s password=%s', 
-                            v_ip, v_port, p_target_db, v_user, pgp_sym_decrypt(v_pass, 'TU_LLAVE_MAESTRA'));
+    -- [3] Retrieve the authorized cryptographic function from settings
+    SELECT setting_value INTO v_decrypt_func
+    FROM fdw_conf.ctl_settings
+    WHERE setting_name = 'crypto_decrypt_function';
 
-    -- 4. Ejecutar vía dblink (Aquí integraremos tu lógica de fetch_size en la versión final)
-    -- EXECUTE v_insert_stmt || ' SELECT * FROM dblink(...)';
-    
-    -- 5. Registrar Éxito
+    IF v_decrypt_func IS NULL THEN
+        RAISE EXCEPTION 'CRITICAL: Decryption function not defined in ctl_settings.';
+    END IF;
+
+    -- [4] Secure decryption in RAM
+    v_dynamic_sql := format('SELECT %s($1)', v_decrypt_func);
+    EXECUTE v_dynamic_sql INTO v_pass_plain USING v_pass_enc;
+
+    v_conn_string := format('host=%s port=%s dbname=%s user=%s password=%s connect_timeout=5', 
+                            v_ip, v_port, p_target_db, v_user, v_pass_plain);
+    v_pass_plain := NULL; -- Scrub plaintext password from memory
+
+    -- [5] Establish dedicated dblink connection
+    PERFORM dblink_connect(v_conn_name, v_conn_string);
+    v_conn_opened := TRUE;
+
+    -- Set session boundaries on the remote server
+    PERFORM dblink_exec(v_conn_name, 'SET statement_timeout = ''15min''; SET log_min_messages = ''panic'';');
+
+    -- [6] Cursor Initiation (FETCH streaming)
+    PERFORM dblink_open(v_conn_name, v_cursor_name, v_source_query);
+
+    -- [7] Chunked extraction loop
+    LOOP
+        v_fetch_sql := format(
+            'INSERT INTO %I.%I (%s) SELECT * FROM dblink_fetch(%L, %L, %s) AS data(%s)',
+            v_target_schema, v_target_table, v_target_columns, v_conn_name, v_cursor_name, v_fetch_size, v_columns_type
+        );
+        
+        EXECUTE v_fetch_sql;
+        GET DIAGNOSTICS v_batch_rows = ROW_COUNT;
+        
+        v_total_rows := v_total_rows + v_batch_rows;
+        
+        -- Break loop when no more rows are returned
+        EXIT WHEN v_batch_rows = 0;
+    END LOOP;
+
+    -- [8] Graceful closure
+    PERFORM dblink_close(v_conn_name, v_cursor_name);
+    PERFORM dblink_disconnect(v_conn_name);
+    v_conn_opened := FALSE;
+
+    -- [9] Register success in audit log
     INSERT INTO fdw_conf.log_exec_query (id_server, id_query, target_db, status, rows_affected, start_time, end_time)
-    VALUES (p_id_server, p_id_query, p_target_db, 'SUCCESS', v_rows, v_start_time, clock_timestamp());
+    VALUES (p_id_server, p_id_query, p_target_db, 'SUCCESSFUL', v_total_rows, v_start_time, clock_timestamp());
     
-    RETURN QUERY SELECT TRUE, 'Query executed successfully'::TEXT;
+    RETURN QUERY SELECT TRUE, format('Extraction completed. Rows fetched: %s', v_total_rows);
 
 EXCEPTION WHEN OTHERS THEN
-    -- 6. Caja Negra de Errores
+    -- [10] Emergency cleanup and error logging
+    IF v_conn_opened THEN
+        BEGIN
+            PERFORM dblink_disconnect(v_conn_name);
+        EXCEPTION WHEN OTHERS THEN
+            -- Ignore disconnection errors during panic phase
+            NULL;
+        END;
+    END IF;
+
     INSERT INTO fdw_conf.log_exec_query (id_server, id_query, target_db, status, error_message, start_time, end_time)
     VALUES (p_id_server, p_id_query, p_target_db, 'FAILED', SQLERRM, v_start_time, clock_timestamp());
     
     RETURN QUERY SELECT FALSE, SQLERRM::TEXT;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$;
+
+-- Perimeter Defense
+REVOKE EXECUTE ON FUNCTION fdw_conf.pgsql_exec_query(INT, INT, VARCHAR) FROM public;
 
 ```
 
-#### B. Motor de SQL Server (Vía `tds_fdw`)
-
-```sql
-CREATE OR REPLACE FUNCTION fdw_conf.mssql_exec_query(
-    p_id_server INT,
-    p_id_query INT,
-    p_target_db VARCHAR
-) RETURNS TABLE (status BOOLEAN, message TEXT) AS $$
-DECLARE
-    v_ip INET;
-    v_port INT;
-    v_user VARCHAR;
-    v_pass BYTEA;
-    v_source_query TEXT;
-    v_insert_stmt TEXT;
-    v_start_time TIMESTAMPTZ := clock_timestamp();
-    v_rows INT := 0;
-BEGIN
-    -- 1. Obtener datos del servidor (Similar a PGSQL)
-    -- [...] Lógica de recolección de variables [...]
-
-    -- 2. Ejecución Grado Diamante sin crear objetos DDL
-    -- En lugar de crear un CREATE SERVER dinámico, utilizaremos una función 
-    -- que altere un servidor TDS_FDW "plantilla" estático, o utilizaremos 
-    -- un wrapper en C si está disponible. Por ahora, ajustamos el mapeo persistente:
-    
-    -- ALTER SERVER mssql_template OPTIONS (SET servername 'ip', SET port 'port');
-    -- ALTER USER MAPPING FOR current_user SERVER mssql_template ...
-    
-    -- 3. Ejecución y volcado de datos
-    -- EXECUTE v_insert_stmt || ' SELECT * FROM foreign_table_template';
-
-    -- 4. Registrar Éxito
-    INSERT INTO fdw_conf.log_exec_query (id_server, id_query, target_db, status, rows_affected, start_time, end_time)
-    VALUES (p_id_server, p_id_query, p_target_db, 'SUCCESS', v_rows, v_start_time, clock_timestamp());
-
-    RETURN QUERY SELECT TRUE, 'Query executed successfully'::TEXT;
-
-EXCEPTION WHEN OTHERS THEN
-    INSERT INTO fdw_conf.log_exec_query (id_server, id_query, target_db, status, error_message, start_time, end_time)
-    VALUES (p_id_server, p_id_query, p_target_db, 'FAILED', SQLERRM, v_start_time, clock_timestamp());
-    
-    RETURN QUERY SELECT FALSE, SQLERRM::TEXT;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
-```
  
