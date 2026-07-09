@@ -179,25 +179,20 @@ CREATE TABLE fdw_conf.ctl_query_conf (
 );
 
 
-
--- 8. Bitácora de Auditoría (Reemplaza a log_exec_query)
+-- 8. Audit Log (Updated with fetch telemetry)
 CREATE TABLE fdw_conf.log_exec_query (
     id_log BIGSERIAL PRIMARY KEY,
     id_server INT NOT NULL REFERENCES fdw_conf.cat_server(id_server),
     id_query INT NOT NULL REFERENCES fdw_conf.ctl_queries(id_query),
     target_db VARCHAR(100) NOT NULL,
-    status fdw_conf.execution_status NOT NULL,        -- 'SUCCESS', 'FAILED'
+    status fdw_conf.execution_status NOT NULL,        -- 'SUCCESSFUL', 'FAILED', etc.
     rows_affected INT DEFAULT 0,
+    fetch_cycles INT DEFAULT 0,                       -- NEW: Tracks pagination cycles
     error_message TEXT,
     start_time TIMESTAMPTZ DEFAULT clock_timestamp(),
-    date_insert TIMESTAMPTZ
+    date_insert TIMESTAMPTZ DEFAULT clock_timestamp()
 );
-
-
-
-
-
-
+ 
 ```
 
 ---
@@ -301,8 +296,10 @@ REVOKE EXECUTE ON FUNCTION fdw_conf.fn_decrypt_credentials(BYTEA) FROM public;
 -- ==============================================================================
 -- FUNCTION: fdw_conf.pgsql_exec_query
 -- DESCRIPTION: Core extraction engine for PostgreSQL nodes. Uses dblink cursors 
--- (FETCH) to paginate massive datasets and prevent Out-Of-Memory (OOM) events.
+-- (FETCH) to paginate datasets, preventing OOM events, and tracks fetch cycles.
+-- SECURITY: Uses OS-level asymmetric decryption and enforces strict search_path.
 -- ==============================================================================
+
 CREATE OR REPLACE FUNCTION fdw_conf.pgsql_exec_query(
     p_id_server INT,
     p_id_query INT,
@@ -339,6 +336,7 @@ DECLARE
     v_fetch_size INT := 5000; -- RAM protection threshold
     v_batch_rows INT := 0;
     v_total_rows INT := 0;
+    v_fetch_cycles INT := 0;  -- Cycle tracker
     v_start_time TIMESTAMPTZ := clock_timestamp();
     v_conn_opened BOOLEAN := FALSE;
 BEGIN
@@ -360,7 +358,7 @@ BEGIN
     SELECT COALESCE(setting_value, '15min') INTO v_statement_timeout 
     FROM fdw_conf.ctl_settings WHERE setting_name = 'statement_timeout';
 
-    -- [3] Dynamic decryption in isolated RAM context
+    -- [3] Dynamic decryption via OS-level private key
     v_pass_plain := fdw_conf.fn_decrypt_credentials(v_pass_enc);
 
     -- Build Connection String with network timeout
@@ -395,6 +393,9 @@ BEGIN
         
         -- Break if the block is empty
         EXIT WHEN v_batch_rows = 0;
+        
+        -- Increment cycle counter after a successful fetch block
+        v_fetch_cycles := v_fetch_cycles + 1;
     END LOOP;
 
     -- [7] Graceful Teardown
@@ -402,11 +403,11 @@ BEGIN
     PERFORM dblink_disconnect(v_conn_name);
     v_conn_opened := FALSE;
 
-    -- [8] Register Telemetry
-    INSERT INTO fdw_conf.log_exec_query (id_server, id_query, target_db, status, rows_affected, start_time, end_time)
-    VALUES (p_id_server, p_id_query, p_target_db, 'SUCCESSFUL', v_total_rows, v_start_time, clock_timestamp());
+    -- [8] Register Telemetry (Successful execution)
+    INSERT INTO fdw_conf.log_exec_query (id_server, id_query, target_db, status, rows_affected, fetch_cycles, start_time)
+    VALUES (p_id_server, p_id_query, p_target_db, 'SUCCESSFUL', v_total_rows, v_fetch_cycles, v_start_time);
     
-    RETURN QUERY SELECT TRUE, format('Extraction completed. Rows fetched: %s', v_total_rows);
+    RETURN QUERY SELECT TRUE, format('Extraction completed. Rows: %s, Cycles: %s', v_total_rows, v_fetch_cycles);
 
 EXCEPTION WHEN OTHERS THEN
     -- [9] Emergency Cleanup & Forensic Logging
@@ -417,16 +418,15 @@ EXCEPTION WHEN OTHERS THEN
         END;
     END IF;
 
-    -- Log the exact failure
-    INSERT INTO fdw_conf.log_exec_query (id_server, id_query, target_db, status, error_message, start_time, end_time)
-    VALUES (p_id_server, p_id_query, p_target_db, 'FAILED', SQLERRM, v_start_time, clock_timestamp());
+    -- Log the exact failure, keeping the state of v_total_rows and v_fetch_cycles at the moment of the crash
+    INSERT INTO fdw_conf.log_exec_query (id_server, id_query, target_db, status, rows_affected, fetch_cycles, error_message, start_time)
+    VALUES (p_id_server, p_id_query, p_target_db, 'FAILED', v_total_rows, v_fetch_cycles, SQLERRM, v_start_time);
     
-    RETURN QUERY SELECT FALSE, format('Execution failed: %s', SQLERRM);
+    RETURN QUERY SELECT FALSE, format('Execution failed at cycle %s: %s', v_fetch_cycles, SQLERRM);
 END;
 $$;
 
 -- Perimeter Defense: Strictly revoke public execution
 REVOKE EXECUTE ON FUNCTION fdw_conf.pgsql_exec_query(INT, INT, VARCHAR) FROM public;
-
 ```
  
