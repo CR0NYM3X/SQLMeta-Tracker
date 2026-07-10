@@ -197,16 +197,7 @@ CREATE TABLE fdw_conf.log_exec_query (
 
 ---
 
-  
-### 🔐 1. CONFIGURACIÓN CRIPTOGRÁFICA (Aislamiento Forense)
-
-Registramos las funciones y la **ruta física del archivo** en el catálogo de configuración. Solo el usuario del sistema operativo de PostgreSQL (usualmente `postgres`) tendrá permisos de lectura sobre este archivo en Linux.
-
-```sql
-
-```
-
----
+ 
 
  
 ### 🔐 1. FUNCIONES CRIPTOGRÁFICAS (Asymmetric PGCrypto)
@@ -430,3 +421,85 @@ $$;
 REVOKE EXECUTE ON FUNCTION fdw_conf.pgsql_exec_query(INT, INT, VARCHAR) FROM public;
 ```
  
+
+
+
+
+
+---
+
+### 💎 convert_versions
+
+ 
+```sql
+-- ==============================================================================
+-- FUNCTION: fdw_conf.convert_versions
+-- DESCRIPTION: Converts semantic version strings into comparable BIGINT values.
+-- PERFORMANCE: Marked as IMMUTABLE. The query planner will evaluate this once
+--              per query instead of per row, drastically reducing CPU cycles.
+-- SECURITY: Implements strict search_path ending in pg_temp to prevent 
+--           search path hijacking, and revokes PUBLIC execution.
+-- ==============================================================================
+CREATE OR REPLACE FUNCTION fdw_conf.convert_versions(
+    p_rdbms TEXT,
+    p_version TEXT DEFAULT '0'
+) RETURNS BIGINT 
+LANGUAGE plpgsql 
+IMMUTABLE
+SECURITY DEFINER
+SET client_min_messages = 'notice'
+SET search_path TO fdw_conf, public, pg_temp
+AS $$
+DECLARE
+    v_rdbms       TEXT   := upper(trim(p_rdbms));
+    v_version     TEXT   := COALESCE(NULLIF(trim(p_version), ''), '0');
+    v_parts       TEXT[];
+    v_version_int BIGINT;
+BEGIN
+    -- [1] Strict Input Validation
+    IF v_rdbms NOT IN ('PSQL', 'MSSQL') THEN
+        RAISE EXCEPTION 'ERR-VAL: Invalid RDBMS (%). Allowed values: PSQL, MSSQL.', p_rdbms;
+    END IF;
+    
+    IF v_version !~ '^[0-9.]+$' THEN
+        RAISE EXCEPTION 'ERR-VAL: Invalid version format (%). Only numbers and dots are allowed.', p_version;
+    END IF;
+
+    -- [2] Array Transformation (Faster than multiple split_part calls)
+    v_parts := string_to_array(v_version, '.');
+
+    -- [3] Conversion Logic based on Engine
+    IF v_rdbms = 'PSQL' THEN
+        -- PostgreSQL Logic
+        IF array_length(v_parts, 1) <= 2 THEN 
+            -- Format: Major.Minor (e.g., '17.5' -> 170005)
+            v_version_int := (COALESCE(v_parts[1], '0') || 
+                              LPAD(COALESCE(v_parts[2], '0'), 4, '0'))::BIGINT;
+        ELSE 
+            -- Format: Major.Minor.Patch (e.g., '10.5.1' -> 100501)
+            v_version_int := (COALESCE(v_parts[1], '0') || 
+                              LPAD(COALESCE(v_parts[2], '0'), 2, '0') || 
+                              LPAD(COALESCE(v_parts[3], '0'), 2, '0'))::BIGINT;
+        END IF;
+
+    ELSIF v_rdbms = 'MSSQL' THEN
+        -- Microsoft SQL Server Logic
+        -- Format: Major.Minor.Build.Revision (e.g., '1' -> 10000000000)
+        v_version_int := (COALESCE(v_parts[1], '0') || 
+                          LPAD(COALESCE(v_parts[2], '') || 
+                               COALESCE(v_parts[3], '') || 
+                               COALESCE(v_parts[4], ''), 10, '0'))::BIGINT;
+    END IF; 
+    
+    RETURN v_version_int;
+END;
+$$;
+
+-- Perimeter Defense: Strictly revoke public execution to enforce Zero Trust
+REVOKE EXECUTE ON FUNCTION fdw_conf.convert_versions(TEXT, TEXT) FROM public;
+
+```
+
+
+
+
